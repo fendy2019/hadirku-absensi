@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS public.office_settings (
 CREATE TABLE IF NOT EXISTS public.employees (
     id TEXT PRIMARY KEY,
     nip TEXT UNIQUE NOT NULL,
+    username TEXT UNIQUE,
+    password TEXT NOT NULL DEFAULT 'karyawan123',
     name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
     department TEXT NOT NULL,
