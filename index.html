@@ -28,6 +28,151 @@
 <body class="min-h-screen flex flex-col lg:flex-row bg-slate-50 text-slate-900 pb-20 lg:pb-0">
 
     <!-- ====================================================================
+         LAYAR LOGIN UTAMA (GERBANG AUTENTIKASI SEBELUM MASUK APLIKASI)
+         ==================================================================== -->
+    <div id="auth-login-screen" class="fixed inset-0 z-50 bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 flex items-center justify-center p-4 overflow-y-auto">
+        <div class="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden my-auto">
+            <!-- Header Card Login -->
+            <div class="bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700 p-6 sm:p-7 text-white text-center relative overflow-hidden">
+                <div class="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur-md border border-white/25 mx-auto flex items-center justify-center text-white font-extrabold text-2xl shadow-lg mb-3">
+                    H
+                </div>
+                <h1 class="text-xl font-extrabold tracking-tight">HadirKu <span class="text-xs font-bold bg-white/20 px-2 py-0.5 rounded-full ml-1">CLOUD</span></h1>
+                <p class="text-xs text-indigo-100 mt-1">Sistem Absensi Karyawan Pintar & HRIS Terintegrasi</p>
+            </div>
+
+            <!-- Form Login -->
+            <div class="p-6 sm:p-7 space-y-5">
+                <div>
+                    <h2 class="text-base font-extrabold text-slate-900">Masuk ke Akun Anda</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Silakan masukkan Username (atau NIP) dan Password Anda</p>
+                </div>
+
+                <!-- Alert Error Login -->
+                <div id="login-error-alert" class="hidden p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2.5">
+                    <span>⚠️</span>
+                    <span id="login-error-message">Username atau password yang Anda masukkan salah!</span>
+                </div>
+
+                <form onsubmit="App.handleLoginSubmit(event)" class="space-y-4">
+                    <!-- Kolom Username -->
+                    <div>
+                        <label for="login-username-input" class="block text-xs font-bold text-slate-700 mb-1.5">Username / NIP Karyawan</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 pointer-events-none">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            </span>
+                            <input
+                                id="login-username-input"
+                                type="text"
+                                required
+                                autocomplete="username"
+                                placeholder="Masukkan username (misal: admin atau budi)"
+                                class="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Kolom Password dengan Fitur Eyefish (Show/Hide Password) -->
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label for="login-password-input" class="block text-xs font-bold text-slate-700">Password</label>
+                            <span id="login-password-state-label" class="text-[11px] font-medium text-slate-400">Tersembunyi</span>
+                        </div>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 pointer-events-none">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            </span>
+                            <input
+                                id="login-password-input"
+                                type="password"
+                                required
+                                autocomplete="current-password"
+                                placeholder="Masukkan password Anda"
+                                class="w-full pl-10 pr-12 py-3 rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                            />
+                            <!-- Tombol Eyefish (Toggle Intip Password) -->
+                            <button
+                                type="button"
+                                id="btn-toggle-login-password"
+                                onclick="App.togglePasswordVisibility('login-password-input', 'btn-toggle-login-password', 'login-password-state-label')"
+                                title="Tampilkan / Sembunyikan Password"
+                                aria-label="Tampilkan atau sembunyikan password"
+                                class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-indigo-600 focus:outline-none cursor-pointer transition"
+                            >
+                                <!-- Default: Eye Off (Tertutup) -->
+                                <span class="eye-closed-icon flex items-center justify-center w-7 h-7 rounded-lg hover:bg-indigo-50">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                                        <line x1="1" y1="1" x2="23" y2="23"/>
+                                    </svg>
+                                </span>
+                                <!-- Active: Eye Open (Terbuka / Eyefish) -->
+                                <span class="eye-open-icon hidden items-center justify-center w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                        <circle cx="12" cy="12" r="3"/>
+                                    </svg>
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Opsi Ingat Saya -->
+                    <div class="flex items-center justify-between pt-0.5">
+                        <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer">
+                            <input id="login-remember-me" type="checkbox" checked class="rounded text-indigo-600 focus:ring-indigo-500" />
+                            <span>Ingat sesi login saya</span>
+                        </label>
+                        <span class="text-[11px] text-indigo-600 font-semibold">Supabase Auth Ready</span>
+                    </div>
+
+                    <!-- Tombol Submit Login -->
+                    <button
+                        type="submit"
+                        class="w-full py-3.5 px-5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold uppercase tracking-wider shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 transition cursor-pointer"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+                        <span>Masuk ke Aplikasi (Log In)</span>
+                    </button>
+                </form>
+
+                <!-- Daftar Akun Demo Cepat (1-Klik Isi Otomatis) -->
+                <div class="pt-4 border-t border-slate-100 space-y-2.5">
+                    <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400 text-center">Akun Tersedia (Klik untuk Isi Otomatis)</p>
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <button
+                            type="button"
+                            onclick="App.fillLoginCredentials('admin', 'admin123')"
+                            class="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100/80 text-left transition cursor-pointer"
+                        >
+                            <div class="flex items-center justify-between">
+                                <span class="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-emerald-200/80 text-emerald-900">Admin HRD</span>
+                                <span class="text-[10px] font-mono-clock text-emerald-700">Klik Isi</span>
+                            </div>
+                            <p class="text-xs font-bold text-slate-900 mt-1">Siti Rahmawati</p>
+                            <p class="text-[11px] font-mono-clock text-slate-600">user: <b>admin</b> | pass: <b>admin123</b></p>
+                        </button>
+
+                        <button
+                            type="button"
+                            onclick="App.fillLoginCredentials('budi', 'karyawan123')"
+                            class="p-2.5 rounded-xl border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100/80 text-left transition cursor-pointer"
+                        >
+                            <div class="flex items-center justify-between">
+                                <span class="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-indigo-200/80 text-indigo-900">Karyawan</span>
+                                <span class="text-[10px] font-mono-clock text-indigo-700">Klik Isi</span>
+                            </div>
+                            <p class="text-xs font-bold text-slate-900 mt-1">Budi Santoso</p>
+                            <p class="text-[11px] font-mono-clock text-slate-600">user: <b>budi</b> | pass: <b>karyawan123</b></p>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====================================================================
          SIDEBAR NAVIGASI (DESKTOP)
          ==================================================================== -->
     <aside class="no-print hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 bg-white border-r border-slate-200 z-30">
@@ -72,7 +217,7 @@
         </nav>
 
         <!-- Footer Info -->
-        <div class="p-4 border-t border-slate-100 bg-slate-50/60">
+        <div class="p-4 border-t border-slate-100 bg-slate-50/60 space-y-2">
             <div class="p-3 rounded-xl bg-white border border-slate-200/80 space-y-2">
                 <div class="flex items-center justify-between">
                     <span class="text-[11px] font-bold text-slate-500">WAKTU SERVER</span>
@@ -82,6 +227,10 @@
                     Reset Data Demo
                 </button>
             </div>
+            <button onclick="App.handleLogout()" class="w-full py-2.5 px-3.5 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 flex items-center justify-center gap-2 transition cursor-pointer">
+                <i data-lucide="log-out" class="w-4 h-4"></i>
+                <span>Keluar / Log Out</span>
+            </button>
         </div>
     </aside>
 
@@ -101,15 +250,23 @@
 
                 <!-- Simulasi Pilih Pengguna Aktif (Karyawan / Admin HRD) -->
                 <div class="flex items-center gap-2.5 flex-wrap">
-                    <span class="text-xs font-semibold text-slate-500 hidden sm:inline">Masuk Sebagai:</span>
+                    <span class="text-xs font-semibold text-slate-500 hidden sm:inline">Akun Aktif:</span>
                     <select id="employee-switcher" onchange="App.switchEmployee(this.value)" class="text-xs font-bold bg-slate-100 hover:bg-slate-200/70 text-slate-800 rounded-xl px-3 py-2 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"></select>
                     <span id="active-role-badge"></span>
                     <span id="active-user-dept" class="text-xs text-slate-500 hidden md:inline"></span>
                 </div>
 
-                <!-- Status Cloud Supabase -->
+                <!-- Status Cloud Supabase & Tombol Log Out -->
                 <div class="flex items-center gap-2">
                     <div id="cloud-status-badge" onclick="App.switchTab('settings')"></div>
+                    <button
+                        onclick="App.handleLogout()"
+                        title="Keluar dari akun (Log Out)"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition cursor-pointer"
+                    >
+                        <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+                        <span>Log Out</span>
+                    </button>
                 </div>
             </div>
         </header>
@@ -700,9 +857,27 @@
                         </div>
 
                         <!-- Form Tambah Karyawan Cepat -->
-                        <form onsubmit="App.addNewEmployeeForm(event)" class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
+                        <form onsubmit="App.addNewEmployeeForm(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
                             <input id="new-emp-name" type="text" required placeholder="Nama Lengkap" class="px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white" />
                             <input id="new-emp-nip" type="text" required placeholder="NIP (Misal: 20260109)" class="px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white" />
+                            <input id="new-emp-username" type="text" required placeholder="Username Login (Misal: fajar)" class="px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white" />
+                            <div class="relative">
+                                <input id="new-emp-password" type="password" required value="karyawan123" placeholder="Password Login" class="w-full pl-3 pr-9 py-2 rounded-xl border border-slate-200 text-xs bg-white" />
+                                <button
+                                    type="button"
+                                    id="btn-toggle-new-emp-password"
+                                    onclick="App.togglePasswordVisibility('new-emp-password', 'btn-toggle-new-emp-password')"
+                                    title="Tampilkan / Sembunyikan Password"
+                                    class="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-indigo-600 cursor-pointer"
+                                >
+                                    <span class="eye-closed-icon">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                                    </span>
+                                    <span class="eye-open-icon hidden text-indigo-600">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                    </span>
+                                </button>
+                            </div>
                             <input id="new-emp-email" type="email" placeholder="Email Kantor" class="px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white" />
                             <select id="new-emp-dept" class="px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white">
                                 <option value="Engineering">Engineering</option>
@@ -728,7 +903,7 @@
                             <table class="w-full text-left border-collapse">
                                 <thead>
                                     <tr class="border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                                        <th class="py-2.5 px-3">NIP</th>
+                                        <th class="py-2.5 px-3">NIP & Username</th>
                                         <th class="py-2.5 px-3">Nama & Email</th>
                                         <th class="py-2.5 px-3">Jabatan & Divisi</th>
                                         <th class="py-2.5 px-3">Role</th>
