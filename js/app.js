@@ -4,7 +4,10 @@
  * ============================================================================
  */
 
+const AUTH_SESSION_KEY = 'hadirku_auth_session_v1';
+
 const App = {
+    isAuthenticated: false,
     activeTab: 'attendance', // 'attendance' | 'qr' | 'leave' | 'admin-recap' | 'settings'
     currentEmployeeId: 'EMP-001',
     gpsState: {
@@ -25,13 +28,9 @@ const App = {
     isQrScannerRunning: false,
 
     init() {
-        const savedUser = localStorage.getItem('hadirku_active_user_v1');
-        if (savedUser && window.HadirkuService.state.employees.some(e => e.id === savedUser)) {
-            this.currentEmployeeId = savedUser;
-        }
-
         this.startRealtimeClock();
         this.recalculateGpsDistance();
+        this.checkAuthSession();
         this.renderEmployeeSelector();
         this.updateCloudBadge();
         this.switchTab('attendance');
@@ -41,10 +40,155 @@ const App = {
             window.HadirkuService.fetchFromCloud().then(res => {
                 if (res.ok) {
                     this.renderAllActiveViews();
-                    this.showToast('Terhubung ke Cloud Supabase', 'success');
+                    if (this.isAuthenticated) {
+                        this.showToast('Terhubung ke Cloud Supabase', 'success');
+                    }
                 }
             });
         }
+    },
+
+    // ========================================================================
+    // AUTENTIKASI LOGIN, LOGOUT & FITUR EYEFISH (SHOW/HIDE PASSWORD)
+    // ========================================================================
+    checkAuthSession() {
+        const savedEmpId =
+            sessionStorage.getItem(AUTH_SESSION_KEY) || localStorage.getItem(AUTH_SESSION_KEY);
+        const foundEmp =
+            savedEmpId && window.HadirkuService.state.employees.find(e => e.id === savedEmpId);
+
+        const loginScreen = document.getElementById('auth-login-screen');
+        if (foundEmp) {
+            this.isAuthenticated = true;
+            this.currentEmployeeId = foundEmp.id;
+            if (loginScreen) loginScreen.classList.add('hidden');
+        } else {
+            this.isAuthenticated = false;
+            if (loginScreen) loginScreen.classList.remove('hidden');
+        }
+    },
+
+    togglePasswordVisibility(inputId, btnId, stateLabelId = null) {
+        const inputEl = document.getElementById(inputId);
+        const btnEl = document.getElementById(btnId);
+        const labelEl = stateLabelId ? document.getElementById(stateLabelId) : null;
+        if (!inputEl) return;
+
+        const isCurrentlyPassword = inputEl.type === 'password';
+        inputEl.type = isCurrentlyPassword ? 'text' : 'password';
+
+        if (btnEl) {
+            const closedIcon = btnEl.querySelector('.eye-closed-icon');
+            const openIcon = btnEl.querySelector('.eye-open-icon');
+            if (closedIcon && openIcon) {
+                if (isCurrentlyPassword) {
+                    closedIcon.classList.add('hidden');
+                    openIcon.classList.remove('hidden');
+                    openIcon.classList.add('flex');
+                } else {
+                    openIcon.classList.add('hidden');
+                    openIcon.classList.remove('flex');
+                    closedIcon.classList.remove('hidden');
+                }
+            }
+        }
+
+        if (labelEl) {
+            labelEl.textContent = isCurrentlyPassword ? 'Terlihat (Eyefish Aktif)' : 'Tersembunyi';
+            labelEl.className = isCurrentlyPassword
+                ? 'text-[11px] font-bold text-indigo-600'
+                : 'text-[11px] font-medium text-slate-400';
+        }
+    },
+
+    fillLoginCredentials(username, password) {
+        const userEl = document.getElementById('login-username-input');
+        const passEl = document.getElementById('login-password-input');
+        const errBox = document.getElementById('login-error-alert');
+        if (userEl) userEl.value = username;
+        if (passEl) passEl.value = password;
+        if (errBox) errBox.classList.add('hidden');
+    },
+
+    handleLoginSubmit(e) {
+        e.preventDefault();
+        const usernameVal = (document.getElementById('login-username-input')?.value || '').trim().toLowerCase();
+        const passwordVal = document.getElementById('login-password-input')?.value || '';
+        const rememberMe = document.getElementById('login-remember-me')?.checked;
+        const errBox = document.getElementById('login-error-alert');
+        const errMsg = document.getElementById('login-error-message');
+
+        const employees = window.HadirkuService.state.employees;
+        const matchedEmp = employees.find(emp => {
+            const u = (emp.username || emp.name.split(' ')[0] || '').toLowerCase();
+            const nip = (emp.nip || '').toLowerCase();
+            const email = (emp.email || '').toLowerCase();
+            const expectedPass = emp.password || (emp.role === 'admin' ? 'admin123' : 'karyawan123');
+            return (u === usernameVal || nip === usernameVal || email === usernameVal) && expectedPass === passwordVal;
+        });
+
+        if (!matchedEmp) {
+            if (errMsg) {
+                errMsg.textContent = 'Username/NIP atau Password tidak sesuai! Gunakan akun demo di bawah jika lupa.';
+            }
+            if (errBox) errBox.classList.remove('hidden');
+            return;
+        }
+
+        if (errBox) errBox.classList.add('hidden');
+        this.isAuthenticated = true;
+        this.currentEmployeeId = matchedEmp.id;
+        localStorage.setItem('hadirku_active_user_v1', matchedEmp.id);
+        sessionStorage.setItem(AUTH_SESSION_KEY, matchedEmp.id);
+        if (rememberMe) {
+            localStorage.setItem(AUTH_SESSION_KEY, matchedEmp.id);
+        } else {
+            localStorage.removeItem(AUTH_SESSION_KEY);
+        }
+
+        const loginScreen = document.getElementById('auth-login-screen');
+        if (loginScreen) loginScreen.classList.add('hidden');
+
+        this.renderAllActiveViews();
+        setTimeout(() => this.initOrUpdateMap(), 120);
+        this.showToast(`Selamat datang, ${matchedEmp.name} (${matchedEmp.role === 'admin' ? 'Admin HRD' : matchedEmp.department})!`, 'success');
+    },
+
+    handleLogout() {
+        this.stopCamera();
+        if (this.isQrScannerRunning) {
+            this.stopQrScanner();
+        }
+        this.isAuthenticated = false;
+        sessionStorage.removeItem(AUTH_SESSION_KEY);
+        localStorage.removeItem(AUTH_SESSION_KEY);
+
+        // Reset form login & kembalikan password ke mode tersembunyi
+        const passInput = document.getElementById('login-password-input');
+        const toggleBtn = document.getElementById('btn-toggle-login-password');
+        const stateLabel = document.getElementById('login-password-state-label');
+        if (passInput) {
+            passInput.value = '';
+            passInput.type = 'password';
+        }
+        if (toggleBtn) {
+            const closedIcon = toggleBtn.querySelector('.eye-closed-icon');
+            const openIcon = toggleBtn.querySelector('.eye-open-icon');
+            if (closedIcon) closedIcon.classList.remove('hidden');
+            if (openIcon) {
+                openIcon.classList.add('hidden');
+                openIcon.classList.remove('flex');
+            }
+        }
+        if (stateLabel) {
+            stateLabel.textContent = 'Tersembunyi';
+            stateLabel.className = 'text-[11px] font-medium text-slate-400';
+        }
+
+        const loginScreen = document.getElementById('auth-login-screen');
+        if (loginScreen) loginScreen.classList.remove('hidden');
+
+        this.showToast('Anda telah berhasil keluar (Log Out).', 'info');
     },
 
     get currentEmployee() {
@@ -1311,7 +1455,10 @@ const App = {
                 .map(
                     emp => `
                     <tr class="border-b border-slate-100 hover:bg-slate-50 transition">
-                        <td class="py-3 px-3 text-xs font-mono-clock font-bold text-indigo-700">${emp.nip}</td>
+                        <td class="py-3 px-3">
+                            <p class="text-xs font-mono-clock font-bold text-indigo-700">${emp.nip}</p>
+                            <p class="text-[11px] font-mono-clock text-slate-500">user: <b>${emp.username || emp.name.split(' ')[0].toLowerCase()}</b></p>
+                        </td>
                         <td class="py-3 px-3">
                             <p class="text-xs font-bold text-slate-900">${emp.name}</p>
                             <p class="text-[11px] text-slate-500">${emp.email}</p>
@@ -1358,6 +1505,8 @@ const App = {
         e.preventDefault();
         const name = document.getElementById('new-emp-name').value.trim();
         const nip = document.getElementById('new-emp-nip').value.trim();
+        const username = (document.getElementById('new-emp-username')?.value || '').trim().toLowerCase() || name.split(' ')[0].toLowerCase();
+        const password = document.getElementById('new-emp-password')?.value || 'karyawan123';
         const email = document.getElementById('new-emp-email').value.trim();
         const department = document.getElementById('new-emp-dept').value;
         const position = document.getElementById('new-emp-position').value.trim();
@@ -1372,6 +1521,8 @@ const App = {
         await window.HadirkuService.upsertEmployee({
             id: empId,
             nip,
+            username,
+            password,
             name,
             email: email || `${name.toLowerCase().replace(/\s+/g, '.')}@nusantaradigital.id`,
             department,
@@ -1384,8 +1535,10 @@ const App = {
         });
 
         e.target.reset();
+        const passEl = document.getElementById('new-emp-password');
+        if (passEl) passEl.value = 'karyawan123';
         this.renderAllActiveViews();
-        this.showToast(`Karyawan baru (${name}) berhasil ditambahkan!`, 'success');
+        this.showToast(`Karyawan baru (${name} — user: ${username}) berhasil ditambahkan!`, 'success');
     },
 
     async removeEmployee(empId) {

@@ -69,6 +69,8 @@ function getInitialSeedState() {
             {
                 id: 'EMP-001',
                 nip: '20260101',
+                username: 'budi',
+                password: 'karyawan123',
                 name: 'Budi Santoso',
                 email: 'budi.santoso@nusantaradigital.id',
                 department: 'Engineering',
@@ -82,6 +84,8 @@ function getInitialSeedState() {
             {
                 id: 'EMP-002',
                 nip: '20260102',
+                username: 'admin',
+                password: 'admin123',
                 name: 'Siti Rahmawati',
                 email: 'siti.rahma@nusantaradigital.id',
                 department: 'Human Resources',
@@ -95,6 +99,8 @@ function getInitialSeedState() {
             {
                 id: 'EMP-003',
                 nip: '20260103',
+                username: 'andi',
+                password: 'karyawan123',
                 name: 'Andi Pratama',
                 email: 'andi.pratama@nusantaradigital.id',
                 department: 'Product & Design',
@@ -108,6 +114,8 @@ function getInitialSeedState() {
             {
                 id: 'EMP-004',
                 nip: '20260104',
+                username: 'dewi',
+                password: 'karyawan123',
                 name: 'Dewi Lestari',
                 email: 'dewi.lestari@nusantaradigital.id',
                 department: 'Finance',
@@ -121,6 +129,8 @@ function getInitialSeedState() {
             {
                 id: 'EMP-005',
                 nip: '20260105',
+                username: 'rizky',
+                password: 'karyawan123',
                 name: 'Rizky Ramadhan',
                 email: 'rizky.ramadhan@nusantaradigital.id',
                 department: 'Engineering',
@@ -380,18 +390,27 @@ class HadirkuDataService {
     }
 
     loadLocalState() {
+        const seed = getInitialSeedState();
         try {
             const raw = localStorage.getItem(STORAGE_KEYS.STATE);
             if (raw) {
                 const parsed = JSON.parse(raw);
                 if (parsed && parsed.employees && parsed.attendanceLogs) {
+                    // Pastikan setiap karyawan memiliki username & password default jika dari state lama
+                    parsed.employees = parsed.employees.map(emp => {
+                        const seedEmp = seed.employees.find(s => s.id === emp.id);
+                        return {
+                            ...emp,
+                            username: emp.username || (seedEmp ? seedEmp.username : emp.name.split(' ')[0].toLowerCase()),
+                            password: emp.password || (seedEmp ? seedEmp.password : (emp.role === 'admin' ? 'admin123' : 'karyawan123'))
+                        };
+                    });
                     return parsed;
                 }
             }
         } catch (err) {
             console.warn('Gagal membaca state lokal, menggunakan seed data:', err);
         }
-        const seed = getInitialSeedState();
         this.saveLocalState(seed);
         return seed;
     }
