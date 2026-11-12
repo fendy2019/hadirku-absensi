@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HadirKu — Aplikasi Absensi Karyawan & HRIS Cloud</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Leaflet CSS & JS (Peta GPS Interaktif) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- QRCode Generator & HTML5 QR Scanner -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+    <!-- Supabase JS SDK v2 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body class="min-h-screen flex flex-col lg:flex-row bg-slate-50 text-slate-900 pb-20 lg:pb-0">
+
+    <!-- ====================================================================
+         SIDEBAR NAVIGASI (DESKTOP)
+         ==================================================================== -->
+    <aside class="no-print hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 bg-white border-r border-slate-200 z-30">
+        <!-- Brand Logo -->
+        <div class="p-5 border-b border-slate-100 flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center text-white font-extrabold text-lg shadow-md shadow-indigo-200">
+                H
+            </div>
+            <div>
+                <h1 class="text-base font-extrabold tracking-tight text-slate-900">HadirKu <span class="text-xs font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-md">PRO</span></h1>
+                <p class="text-[11px] text-slate-500 font-medium">Smart Attendance & HRIS</p>
+            </div>
+        </div>
+
+        <!-- Menu Navigasi -->
+        <nav class="flex-1 p-4 space-y-1.5 overflow-y-auto">
+            <p class="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Menu Karyawan</p>
+            <button data-nav-tab="attendance" onclick="App.switchTab('attendance')" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold bg-indigo-600 text-white shadow-sm shadow-indigo-200 transition cursor-pointer">
+                <i data-lucide="map-pin" class="w-4 h-4"></i>
+                <span>Absen Selfie & GPS</span>
+            </button>
+            <button data-nav-tab="qr" onclick="App.switchTab('qr')" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition cursor-pointer">
+                <i data-lucide="qr-code" class="w-4 h-4"></i>
+                <span>Scan QR & Kartu ID</span>
+            </button>
+            <button data-nav-tab="leave" onclick="App.switchTab('leave')" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition cursor-pointer">
+                <i data-lucide="calendar-clock" class="w-4 h-4"></i>
+                <span>Izin, Cuti & Lembur</span>
+            </button>
+
+            <div class="pt-4">
+                <p class="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Admin & Database</p>
+                <button data-nav-tab="admin-recap" onclick="App.switchTab('admin-recap')" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition cursor-pointer">
+                    <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                    <span>Dashboard Rekap & Export</span>
+                </button>
+                <button data-nav-tab="settings" onclick="App.switchTab('settings')" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition cursor-pointer">
+                    <i data-lucide="database" class="w-4 h-4"></i>
+                    <span>Karyawan & Cloud Supabase</span>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Footer Info -->
+        <div class="p-4 border-t border-slate-100 bg-slate-50/60">
+            <div class="p-3 rounded-xl bg-white border border-slate-200/80 space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-bold text-slate-500">WAKTU SERVER</span>
+                    <span id="topbar-clock" class="text-xs font-mono-clock font-bold text-indigo-600">00:00:00</span>
+                </div>
+                <button onclick="window.HadirkuService.resetDemoData(); App.renderAllActiveViews(); App.showToast('Data demo di-reset ke kondisi awal', 'info');" class="w-full py-1.5 px-2.5 rounded-lg text-[11px] font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition cursor-pointer">
+                    Reset Data Demo
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ====================================================================
+         AREA KONTEN UTAMA
+         ==================================================================== -->
+    <div class="flex-1 lg:pl-64 flex flex-col min-h-screen">
+
+        <!-- TOPBAR: Switcher Karyawan/Admin & Status Koneksi Cloud -->
+        <header class="no-print sticky top-0 z-20 bg-white/90 backdrop-blur-md border-b border-slate-200 px-4 sm:px-6 py-3">
+            <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+                <!-- Mobile Brand -->
+                <div class="flex items-center gap-2.5 lg:hidden">
+                    <div class="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold text-sm">H</div>
+                    <span class="font-extrabold text-sm text-slate-900">HadirKu</span>
+                </div>
+
+                <!-- Simulasi Pilih Pengguna Aktif (Karyawan / Admin HRD) -->
+                <div class="flex items-center gap-2.5 flex-wrap">
+                    <span class="text-xs font-semibold text-slate-500 hidden sm:inline">Masuk Sebagai:</span>
+                    <select id="employee-switcher" onchange="App.switchEmployee(this.value)" class="text-xs font-bold bg-slate-100 hover:bg-slate-200/70 text-slate-800 rounded-xl px-3 py-2 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"></select>
+                    <span id="active-role-badge"></span>
+                    <span id="active-user-dept" class="text-xs text-slate-500 hidden md:inline"></span>
+                </div>
+
+                <!-- Status Cloud Supabase -->
+                <div class="flex items-center gap-2">
+                    <div id="cloud-status-badge" onclick="App.switchTab('settings')"></div>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN CONTAINER -->
+        <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+
+            <!-- ============================================================
+                 TAB 1: ABSEN MASUK & PULANG + SELFIE + LOKASI GPS
+                 ============================================================ -->
+            <section id="tab-attendance" class="tab-section space-y-6">
+                <!-- Banner Jam Real-time -->
+                <div class="rounded-3xl bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 text-white p-6 sm:p-7 shadow-xl shadow-indigo-950/10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                    <div class="space-y-1.5">
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-indigo-200 backdrop-blur-sm">
+                            <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+                            <span id="office-schedule-info">Jam Kerja: 08:00 – 17:00 WIB</span>
+                        </span>
+                        <h2 id="live-clock-display" class="text-4xl sm:text-5xl font-extrabold font-mono-clock tracking-tight text-white pt-1">00:00:00</h2>
+                        <p id="live-date-display" class="text-sm text-indigo-200 font-medium">Memuat tanggal...</p>
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <button onclick="App.switchTab('qr')" class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold border border-white/15 flex items-center justify-center gap-2 transition cursor-pointer">
+                            <i data-lucide="qr-code" class="w-4 h-4"></i>
+                            <span>Absen via QR Code</span>
+                        </button>
+                        <button onclick="App.switchTab('leave')" class="px-4 py-2.5 rounded-xl bg-indigo-500/30 hover:bg-indigo-500/40 text-white text-xs font-semibold border border-indigo-400/30 flex items-center justify-center gap-2 transition cursor-pointer">
+                            <i data-lucide="file-plus-2" class="w-4 h-4"></i>
+                            <span>Ajukan Izin / Cuti / Lembur</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Grid 2 Kolom: Kamera Selfie & Peta GPS -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <!-- Kolom Kiri: Kamera Selfie & Tombol Absen Masuk/Pulang (7 cols) -->
+                    <div class="lg:col-span-7 bg-white rounded-3xl border border-slate-200/90 shadow-sm p-5 sm:p-6 space-y-5">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-base font-extrabold text-slate-900">1. Verifikasi Wajah (Selfie) & Kehadiran</h3>
+                                <p class="text-xs text-slate-500">Foto dilengkapi watermark waktu & titik GPS otomatis</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="App.startCamera()" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition cursor-pointer">
+                                    Buka Kamera
+                                </button>
+                                <button onclick="App.useSimulatedSelfie()" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition cursor-pointer">
+                                    Gunakan Foto Instan
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Viewport Kamera / Hasil Foto -->
+                        <div class="relative w-full h-64 sm:h-72 rounded-2xl bg-slate-950 overflow-hidden flex items-center justify-center border border-slate-800">
+                            <video id="selfie-video" autoplay playsinline muted class="hidden w-full h-full object-cover"></video>
+                            <canvas id="selfie-canvas" class="hidden"></canvas>
+                            <img id="selfie-preview-img" alt="Hasil Selfie" class="hidden w-full h-full object-cover" />
+
+                            <div id="camera-placeholder" class="text-center p-6 space-y-3">
+                                <div class="w-14 h-14 rounded-2xl bg-slate-800/90 border border-slate-700 text-indigo-400 mx-auto flex items-center justify-center">
+                                    <i data-lucide="camera" class="w-7 h-7"></i>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-bold text-white">Kamera Siap Digunakan</p>
+                                    <p class="text-xs text-slate-400 max-w-xs mx-auto mt-1">Klik "Buka Kamera" untuk selfie webcam/HP, atau langsung klik Absen Masuk untuk menggunakan foto digital otomatis.</p>
+                                </div>
+                                <div class="flex justify-center gap-2 pt-1">
+                                    <button onclick="App.startCamera()" class="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition cursor-pointer">
+                                        Aktifkan Webcam / Kamera
+                                    </button>
+                                    <button onclick="App.useSimulatedSelfie()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 transition cursor-pointer">
+                                        Simulasi Foto Terverifikasi
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Tombol Jepret saat kamera aktif -->
+                            <button onclick="App.captureSelfie()" class="absolute bottom-3 right-3 px-3.5 py-2 rounded-xl bg-white/90 hover:bg-white text-slate-900 text-xs font-bold shadow-md flex items-center gap-1.5 transition cursor-pointer">
+                                <i data-lucide="aperture" class="w-4 h-4 text-indigo-600"></i>
+                                <span>Ambil Foto Selfie</span>
+                            </button>
+                        </div>
+
+                        <!-- Status Kehadiran Hari Ini -->
+                        <div id="today-attendance-status-card"></div>
+
+                        <!-- Input Catatan Opsional -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1.5">Catatan Kehadiran / Aktivitas Hari Ini (Opsional)</label>
+                            <input id="attendance-notes-input" type="text" placeholder="Contoh: Hadir di kantor pusat / Rapat klien / Lembur rilis aplikasi..." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50/60" />
+                        </div>
+
+                        <!-- Tombol Aksi Utama: Absen Masuk & Absen Pulang -->
+                        <div class="flex flex-col sm:flex-row gap-3 pt-1">
+                            <button id="btn-clock-in" onclick="App.submitClockAction('in', 'Selfie + GPS')" class="flex-1 py-3.5 px-5 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 transition cursor-pointer">
+                                <i data-lucide="log-in" class="w-5 h-5"></i>
+                                <span>ABSEN MASUK SEKARANG</span>
+                            </button>
+                            <button id="btn-clock-out" onclick="App.submitClockAction('out', 'Selfie + GPS')" class="flex-1 py-3.5 px-5 rounded-xl font-bold text-white bg-rose-600 hover:bg-rose-700 shadow-lg shadow-rose-200 flex items-center justify-center gap-2 transition cursor-pointer">
+                                <i data-lucide="log-out" class="w-5 h-5"></i>
+                                <span>ABSEN PULANG SEKARANG</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Kolom Kanan: Peta Lokasi GPS & Geofencing (5 cols) -->
+                    <div class="lg:col-span-5 bg-white rounded-3xl border border-slate-200/90 shadow-sm p-5 sm:p-6 flex flex-col justify-between space-y-4">
+                        <div class="space-y-3">
+                            <div class="flex items-start justify-between gap-2">
+                                <div>
+                                    <h3 class="text-base font-extrabold text-slate-900">2. Titik Lokasi GPS & Radius Kantor</h3>
+                                    <p id="gps-coords-text" class="text-xs text-slate-500 mt-0.5">Koordinat: -6.2088, 106.8456</p>
+                                </div>
+                                <span id="gps-distance-badge"></span>
+                            </div>
+
+                            <!-- Peta Interaktif Leaflet -->
+                            <div id="gps-map" class="w-full h-64 sm:h-72 rounded-2xl border border-slate-200 overflow-hidden"></div>
+                        </div>
+
+                        <!-- Kontrol Lokasi GPS (Asli vs Simulasi untuk kemudahan testing di PC/HP) -->
+                        <div class="space-y-2.5 pt-2 border-t border-slate-100">
+                            <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Kontrol & Pengujian Lokasi GPS</p>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                <button onclick="App.requestRealDeviceGps()" class="py-2 px-3 rounded-xl text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition cursor-pointer">
+                                    📍 GPS Perangkat Asli
+                                </button>
+                                <button onclick="App.useSimulatedGps('office')" class="py-2 px-3 rounded-xl text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition cursor-pointer">
+                                    🏢 Simulasi di Kantor
+                                </button>
+                                <button onclick="App.useSimulatedGps('remote')" class="py-2 px-3 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition cursor-pointer">
+                                    🏠 Simulasi Luar Kantor
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabel Riwayat Kehadiran Pribadi -->
+                <div class="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-5 sm:p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 class="text-base font-extrabold text-slate-900">Riwayat Kehadiran Anda</h3>
+                            <p class="text-xs text-slate-500">Catatan jam masuk, pulang, status keterlambatan, dan bukti foto</p>
+                        </div>
+                        <button onclick="App.switchTab('admin-recap')" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer">
+                            Lihat Rekap Semua Karyawan →
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                    <th class="py-2.5 px-3">Tanggal</th>
+                                    <th class="py-2.5 px-3">Jam Masuk</th>
+                                    <th class="py-2.5 px-3">Jam Pulang</th>
+                                    <th class="py-2.5 px-3">Status</th>
+                                    <th class="py-2.5 px-3">Metode & Lokasi</th>
+                                    <th class="py-2.5 px-3 text-right">Bukti</th>
+                                </tr>
+                            </thead>
+                            <tbody id="personal-attendance-history"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================================================
+                 TAB 2: SCAN QR CODE & KARTU ID DIGITAL
+                 ============================================================ -->
+            <section id="tab-qr" class="tab-section hidden space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <!-- Kolom Scanner QR (6 cols) -->
+                    <div class="lg:col-span-6 bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-5">
+                        <div>
+                            <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700">Absensi Tanpa Sentuh</span>
+                            <h3 class="text-lg font-extrabold text-slate-900 mt-2">Scanner QR Code Kehadiran</h3>
+                            <p class="text-xs text-slate-500">Arahkan kamera ke QR Gate Kantor atau Kartu ID Karyawan untuk Absen Masuk/Pulang otomatis.</p>
+                        </div>
+
+                        <!-- Area Kamera QR -->
+                        <div class="relative w-full min-h-[250px] rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden flex flex-col items-center justify-center p-4">
+                            <div class="scanner-laser"></div>
+                            <div id="qr-reader-viewport" class="w-full max-w-xs"></div>
+                            <p class="text-xs text-slate-400 text-center mt-3">Kamera QR mendukung webcam laptop maupun kamera belakang smartphone</p>
+                        </div>
+
+                        <!-- Tombol Kamera & Simulasi 1-Klik -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <button id="btn-toggle-qr-camera" onclick="App.startQrScanner()" class="py-3 px-4 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-100 transition cursor-pointer">
+                                Aktifkan Kamera Scan QR
+                            </button>
+                            <button onclick="App.simulateInstantQrScan()" class="py-3 px-4 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-100 transition cursor-pointer">
+                                ⚡ Simulasi Scan QR Kantor (Instan)
+                            </button>
+                        </div>
+
+                        <!-- Input Manual Kode QR / NIP -->
+                        <div class="pt-3 border-t border-slate-100">
+                            <label class="block text-xs font-bold text-slate-700 mb-1.5">Atau Masukkan Token QR Gate / NIP Karyawan Secara Manual:</label>
+                            <div class="flex gap-2">
+                                <input id="manual-qr-input" type="text" placeholder="Ketik HADIRKU-GATE-2026-HQ atau NIP (misal 20260101)..." class="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                                <button onclick="App.submitManualQrCode()" class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer">
+                                    Proses Absen
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Kolom Kartu ID Digital Karyawan & QR Gate Kantor (6 cols) -->
+                    <div class="lg:col-span-6 space-y-6">
+                        <!-- Kartu ID Digital Karyawan -->
+                        <div class="print-only-card bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <div>
+                                    <h3 class="text-base font-extrabold text-slate-900">Kartu ID Digital Karyawan</h3>
+                                    <p class="text-xs text-slate-500">Tunjukkan QR ini pada scanner resepsionis kantor</p>
+                                </div>
+                                <button onclick="window.print()" class="no-print px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-1.5 transition cursor-pointer">
+                                    <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+                                    <span>Cetak Kartu ID</span>
+                                </button>
+                            </div>
+
+                            <div class="rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white p-5 flex flex-col sm:flex-row items-center justify-between gap-5">
+                                <div class="space-y-2 text-center sm:text-left">
+                                    <p id="idcard-company-name" class="text-[11px] font-bold uppercase tracking-widest text-indigo-300">PT Nusantara Digital Utama</p>
+                                    <h4 id="idcard-emp-name" class="text-xl font-extrabold text-white">Budi Santoso</h4>
+                                    <p id="idcard-emp-role" class="text-xs text-indigo-200 font-medium">Senior Frontend Engineer</p>
+                                    <div class="pt-2 flex flex-wrap justify-center sm:justify-start gap-2 text-[11px]">
+                                        <span class="px-2.5 py-1 rounded-lg bg-white/10 font-mono-clock">NIP: <b id="idcard-emp-nip">20260101</b></span>
+                                        <span id="idcard-emp-dept" class="px-2.5 py-1 rounded-lg bg-indigo-500/30 font-semibold">Engineering</span>
+                                    </div>
+                                </div>
+                                <div class="bg-white p-3 rounded-2xl shadow-lg">
+                                    <div id="employee-qrcode-box"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- QR Code Gate Kantor (Untuk Monitor Lobby) -->
+                        <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 flex flex-col sm:flex-row items-center justify-between gap-5">
+                            <div class="space-y-1.5">
+                                <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">QR Lobby Kantor Pusat</span>
+                                <h4 class="text-base font-extrabold text-slate-900">QR Gate Resepsionis</h4>
+                                <p class="text-xs text-slate-500">Karyawan dapat memindai QR ini menggunakan HP mereka saat tiba atau pulang kantor.</p>
+                                <p class="text-xs font-mono-clock font-bold text-indigo-600 pt-1">Token: <span id="office-qr-token-display">HADIRKU-GATE-2026-HQ</span></p>
+                            </div>
+                            <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                                <div id="office-qrcode-box"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================================================
+                 TAB 3: PENGAJUAN IZIN, SAKIT, CUTI & LEMBUR
+                 ============================================================ -->
+            <section id="tab-leave" class="tab-section hidden space-y-6">
+                <!-- Ringkasan Kuota Cuti & Status Pengajuan -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+                        <p class="text-xs font-bold uppercase tracking-wider text-slate-400">Sisa Kuota Cuti Tahunan</p>
+                        <p id="leave-quota-remaining" class="text-2xl font-extrabold text-indigo-600 mt-1">12 Hari</p>
+                        <p class="text-xs text-slate-500 mt-0.5">Otomatis terpotong saat Cuti disetujui</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+                        <p class="text-xs font-bold uppercase tracking-wider text-slate-400">Menunggu Persetujuan HRD</p>
+                        <p id="leave-pending-count" class="text-2xl font-extrabold text-amber-600 mt-1">0</p>
+                        <p class="text-xs text-slate-500 mt-0.5">Pengajuan aktif yang perlu ditinjau</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+                        <p class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Pengajuan Disetujui</p>
+                        <p id="leave-approved-count" class="text-2xl font-extrabold text-emerald-600 mt-1">0</p>
+                        <p class="text-xs text-slate-500 mt-0.5">Tercatat otomatis di rekap absensi</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <!-- Form Pengajuan (5 cols) -->
+                    <div class="lg:col-span-5 bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
+                        <h3 class="text-base font-extrabold text-slate-900">Form Pengajuan Izin, Cuti & Lembur</h3>
+                        <p class="text-xs text-slate-500 mb-4">Pengajuan otomatis diajukan atas nama karyawan yang sedang aktif di atas.</p>
+
+                        <form onsubmit="App.submitLeaveOrOvertimeForm(event)" class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">Jenis Pengajuan</label>
+                                <select id="req-type" onchange="App.toggleOvertimeHoursField()" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    <option value="Izin">Izin Keperluan Pribadi</option>
+                                    <option value="Sakit">Sakit (Dengan Keterangan / Surat Dokter)</option>
+                                    <option value="Cuti">Cuti Tahunan</option>
+                                    <option value="Dinas Luar">Perjalanan Dinas Luar Kota / WFH</option>
+                                    <option value="Lembur">Pengajuan Lembur (Overtime)</option>
+                                </select>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">Tanggal Mulai</label>
+                                    <input id="req-start-date" type="date" required class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs" />
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">Tanggal Selesai</label>
+                                    <input id="req-end-date" type="date" required class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs" />
+                                </div>
+                            </div>
+
+                            <div id="overtime-hours-wrapper" class="hidden">
+                                <label class="block text-xs font-bold text-indigo-700 mb-1">Durasi Lembur (Jam)</label>
+                                <input id="req-overtime-hours" type="number" step="0.5" min="0.5" max="12" value="2" class="w-full px-3.5 py-2 rounded-xl border border-indigo-200 bg-indigo-50/40 text-xs font-bold" />
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">Alasan / Keterangan Lengkap</label>
+                                <textarea id="req-reason" rows="3" required placeholder="Jelaskan alasan izin, cuti, sakit, atau detail pekerjaan lembur..." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">Lampiran Surat Dokter / Bukti (Opsional)</label>
+                                <input id="req-attachment" type="file" class="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" />
+                            </div>
+
+                            <button type="submit" class="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-100 transition cursor-pointer">
+                                Kirim Pengajuan Sekarang
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Daftar & Approval Pengajuan (7 cols) -->
+                    <div class="lg:col-span-7 bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h3 class="text-base font-extrabold text-slate-900">Daftar Pengajuan & Panel Approval HRD</h3>
+                                <p class="text-xs text-slate-500">Klik "Setujui" untuk langsung mencatat izin/cuti ke rekap absensi</p>
+                            </div>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                        <th class="py-2.5 px-3">Karyawan</th>
+                                        <th class="py-2.5 px-3">Tipe</th>
+                                        <th class="py-2.5 px-3">Tanggal</th>
+                                        <th class="py-2.5 px-3">Keterangan</th>
+                                        <th class="py-2.5 px-3">Status</th>
+                                        <th class="py-2.5 px-3 text-right">Aksi HRD</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="leave-requests-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================================================
+                 TAB 4: DASHBOARD REKAP ADMIN & EXPORT LAPORAN
+                 ============================================================ -->
+            <section id="tab-admin-recap" class="tab-section hidden space-y-6">
+                <!-- Header & Tombol Export -->
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                    <div>
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">HRIS Analytics & Reporting</span>
+                        <h2 class="text-xl font-extrabold text-slate-900 mt-1">Dashboard Rekapitulasi Kehadiran Karyawan</h2>
+                        <p class="text-xs text-slate-500">Pantau kehadiran real-time, keterlambatan, jam kerja, lembur, dan export laporan ke Excel/CSV.</p>
+                    </div>
+                    <div class="no-print flex flex-wrap items-center gap-2.5">
+                        <button onclick="App.exportToExcel()" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm flex items-center gap-2 transition cursor-pointer">
+                            <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                            <span>Export Excel (.xls)</span>
+                        </button>
+                        <button onclick="App.exportToCSV()" class="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm flex items-center gap-2 transition cursor-pointer">
+                            <i data-lucide="download" class="w-4 h-4"></i>
+                            <span>Export CSV</span>
+                        </button>
+                        <button onclick="window.print()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-2 transition cursor-pointer">
+                            <i data-lucide="printer" class="w-4 h-4"></i>
+                            <span>Cetak PDF</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- KPI Cards -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+                        <p class="text-xs font-bold uppercase text-slate-400">Hadir Hari Ini</p>
+                        <p id="kpi-present-today" class="text-2xl font-extrabold text-emerald-600 mt-1">0 / 5</p>
+                        <p class="text-[11px] text-slate-500 mt-0.5">Karyawan sudah check-in</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+                        <p class="text-xs font-bold uppercase text-slate-400">Terlambat Hari Ini</p>
+                        <p id="kpi-late-today" class="text-2xl font-extrabold text-amber-600 mt-1">0 Orang</p>
+                        <p class="text-[11px] text-slate-500 mt-0.5">Melewati batas toleransi</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+                        <p class="text-xs font-bold uppercase text-slate-400">Izin / Sakit / Cuti</p>
+                        <p id="kpi-leave-today" class="text-2xl font-extrabold text-sky-600 mt-1">0 Orang</p>
+                        <p class="text-[11px] text-slate-500 mt-0.5">Tidak hadir dengan keterangan</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+                        <p class="text-xs font-bold uppercase text-slate-400">Total Akumulasi Lembur</p>
+                        <p id="kpi-total-overtime" class="text-2xl font-extrabold text-indigo-600 mt-1">0 Jam</p>
+                        <p class="text-[11px] text-slate-500 mt-0.5">Dari seluruh log kehadiran</p>
+                    </div>
+                </div>
+
+                <!-- Filter Bar & Tabel Rekap -->
+                <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-4">
+                    <div class="no-print grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-500 mb-1">Filter Tanggal</label>
+                            <input id="filter-date" type="date" onchange="App.renderAdminRecapTab()" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs" />
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-500 mb-1">Departemen</label>
+                            <select id="filter-department" onchange="App.renderAdminRecapTab()" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs">
+                                <option value="ALL">Semua Departemen</option>
+                                <option value="Engineering">Engineering</option>
+                                <option value="Human Resources">Human Resources</option>
+                                <option value="Product & Design">Product & Design</option>
+                                <option value="Finance">Finance</option>
+                                <option value="Marketing">Marketing</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-500 mb-1">Status Kehadiran</label>
+                            <select id="filter-status" onchange="App.renderAdminRecapTab()" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs">
+                                <option value="ALL">Semua Status</option>
+                                <option value="Hadir">Hadir Tepat Waktu</option>
+                                <option value="Terlambat">Terlambat</option>
+                                <option value="Izin">Izin</option>
+                                <option value="Sakit">Sakit</option>
+                                <option value="Cuti">Cuti</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-500 mb-1">Cari Nama / ID Karyawan</label>
+                            <input id="filter-search" type="text" oninput="App.renderAdminRecapTab()" placeholder="Ketik nama atau EMP-..." class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs" />
+                        </div>
+                        <div class="flex items-end gap-2">
+                            <button onclick="App.resetRecapFilters()" class="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer">
+                                Tampilkan Semua
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between pt-2">
+                        <span id="recap-row-count" class="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">0 Data Absensi</span>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                    <th class="py-3 px-3">Tanggal</th>
+                                    <th class="py-3 px-3">Karyawan</th>
+                                    <th class="py-3 px-3">Masuk</th>
+                                    <th class="py-3 px-3">Pulang</th>
+                                    <th class="py-3 px-3">Status</th>
+                                    <th class="py-3 px-3">Durasi & Lembur</th>
+                                    <th class="py-3 px-3">Metode & Lokasi</th>
+                                    <th class="py-3 px-3">Catatan</th>
+                                    <th class="py-3 px-3 text-right no-print">Bukti</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-recap-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================================================
+                 TAB 5: PENGATURAN KANTOR, KARYAWAN & CLOUD SUPABASE
+                 ============================================================ -->
+            <section id="tab-settings" class="tab-section hidden space-y-6">
+                <!-- Panel Integrasi Cloud Supabase -->
+                <div class="bg-gradient-to-br from-emerald-950 via-slate-900 to-slate-900 text-white rounded-3xl p-6 sm:p-7 shadow-lg space-y-5">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <div>
+                            <span class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                Integrasi Database Cloud Eksternal
+                            </span>
+                            <h3 class="text-xl font-extrabold text-white mt-2">Konfigurasi Supabase (PostgreSQL Real-Time)</h3>
+                            <p class="text-xs text-slate-300 max-w-2xl mt-1">
+                                Aplikasi ini memiliki arsitektur Hybrid: berjalan langsung dengan <b>Mode Demo Lokal</b> tanpa setup, dan dapat dihubungkan kapan saja ke proyek <b>Supabase</b> Anda. Skema SQL lengkap sudah tersedia di file <code>supabase/schema.sql</code>.
+                            </p>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="App.pushLocalDataToSupabase()" class="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-extrabold transition cursor-pointer">
+                                ⬆️ Upload & Sinkronkan Data Lokal ke Supabase
+                            </button>
+                            <button onclick="App.disconnectSupabase()" class="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition cursor-pointer">
+                                Gunakan Mode Demo Lokal
+                            </button>
+                        </div>
+                    </div>
+
+                    <form onsubmit="App.connectSupabaseForm(event)" class="grid grid-cols-1 md:grid-cols-12 gap-3 pt-2">
+                        <div class="md:col-span-5">
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-emerald-300 mb-1">Supabase Project URL</label>
+                            <input id="supabase-url-input" type="url" placeholder="https://xyzcompany.supabase.co" class="w-full px-3.5 py-2.5 rounded-xl bg-white/10 border border-white/15 text-white placeholder-slate-400 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+                        </div>
+                        <div class="md:col-span-5">
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-emerald-300 mb-1">Supabase Anon / Public Key</label>
+                            <input id="supabase-key-input" type="password" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." class="w-full px-3.5 py-2.5 rounded-xl bg-white/10 border border-white/15 text-white placeholder-slate-400 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+                        </div>
+                        <div class="md:col-span-2 flex items-end">
+                            <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-white text-slate-900 hover:bg-emerald-50 text-xs font-extrabold transition cursor-pointer">
+                                Hubungkan
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Grid 2 Kolom: Pengaturan Jam Kerja Kantor & Manajemen Karyawan -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <!-- Form Pengaturan Kantor (5 cols) -->
+                    <div class="lg:col-span-5 bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
+                        <h3 class="text-base font-extrabold text-slate-900 mb-1">Pengaturan Jam Kerja & Titik Geofence Kantor</h3>
+                        <p class="text-xs text-slate-500 mb-4">Menentukan perhitungan terlambat, lembur, dan jarak radius GPS</p>
+
+                        <form onsubmit="App.saveOfficeSettingsForm(event)" class="space-y-3.5">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">Nama Perusahaan / Instansi</label>
+                                <input id="set-company-name" type="text" required class="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-semibold" />
+                            </div>
+
+                            <div class="grid grid-cols-3 gap-2.5">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">Jam Masuk</label>
+                                    <input id="set-work-start" type="time" required class="w-full px-2.5 py-2 rounded-xl border border-slate-200 text-xs font-mono-clock" />
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">Toleransi (Mnt)</label>
+                                    <input id="set-late-tolerance" type="number" min="0" max="120" required class="w-full px-2.5 py-2 rounded-xl border border-slate-200 text-xs font-mono-clock" />
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">Jam Pulang</label>
+                                    <input id="set-work-end" type="time" required class="w-full px-2.5 py-2 rounded-xl border border-slate-200 text-xs font-mono-clock" />
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-3 gap-2.5">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">Latitude Kantor</label>
+                                    <input id="set-office-lat" type="number" step="any" required class="w-full px-2.5 py-2 rounded-xl border border-slate-200 text-xs font-mono-clock" />
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">Longitude Kantor</label>
+                                    <input id="set-office-lng" type="number" step="any" required class="w-full px-2.5 py-2 rounded-xl border border-slate-200 text-xs font-mono-clock" />
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">Radius (Meter)</label>
+                                    <input id="set-max-radius" type="number" min="10" max="10000" required class="w-full px-2.5 py-2 rounded-xl border border-slate-200 text-xs font-mono-clock" />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">Token Rahasia QR Gate Kantor</label>
+                                <input id="set-qr-secret" type="text" required class="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-mono-clock" />
+                            </div>
+
+                            <div class="space-y-2 pt-1">
+                                <label class="flex items-center gap-2.5 text-xs font-semibold text-slate-700 cursor-pointer">
+                                    <input id="set-enforce-geofence" type="checkbox" class="rounded text-indigo-600 focus:ring-indigo-500" />
+                                    <span>Wajibkan Berada di Dalam Radius Kantor saat Absen (Geofence Ketat)</span>
+                                </label>
+                                <label class="flex items-center gap-2.5 text-xs font-semibold text-slate-700 cursor-pointer">
+                                    <input id="set-require-selfie" type="checkbox" class="rounded text-indigo-600 focus:ring-indigo-500" />
+                                    <span>Sertakan Foto Selfie Otomatis saat Absen</span>
+                                </label>
+                            </div>
+
+                            <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition cursor-pointer">
+                                Simpan Pengaturan Kantor
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Manajemen Data Karyawan (7 cols) -->
+                    <div class="lg:col-span-7 bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-5">
+                        <div>
+                            <h3 class="text-base font-extrabold text-slate-900">Manajemen Daftar Karyawan</h3>
+                            <p class="text-xs text-slate-500">Tambah karyawan baru atau kelola akses Admin HRD</p>
+                        </div>
+
+                        <!-- Form Tambah Karyawan Cepat -->
+                        <form onsubmit="App.addNewEmployeeForm(event)" class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
+                            <input id="new-emp-name" type="text" required placeholder="Nama Lengkap" class="px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white" />
+                            <input id="new-emp-nip" type="text" required placeholder="NIP (Misal: 20260109)" class="px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white" />
+                            <input id="new-emp-email" type="email" placeholder="Email Kantor" class="px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white" />
+                            <select id="new-emp-dept" class="px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white">
+                                <option value="Engineering">Engineering</option>
+                                <option value="Product & Design">Product & Design</option>
+                                <option value="Human Resources">Human Resources</option>
+                                <option value="Finance">Finance</option>
+                                <option value="Marketing">Marketing</option>
+                            </select>
+                            <input id="new-emp-position" type="text" placeholder="Jabatan (Misal: Staff IT)" class="px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white" />
+                            <div class="flex gap-2">
+                                <select id="new-emp-role" class="flex-1 px-2.5 py-2 rounded-xl border border-slate-200 text-xs bg-white">
+                                    <option value="employee">Karyawan</option>
+                                    <option value="admin">Admin HRD</option>
+                                </select>
+                                <button type="submit" class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer">
+                                    + Tambah
+                                </button>
+                            </div>
+                        </form>
+
+                        <!-- Tabel Daftar Karyawan -->
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                        <th class="py-2.5 px-3">NIP</th>
+                                        <th class="py-2.5 px-3">Nama & Email</th>
+                                        <th class="py-2.5 px-3">Jabatan & Divisi</th>
+                                        <th class="py-2.5 px-3">Role</th>
+                                        <th class="py-2.5 px-3">Sisa Cuti</th>
+                                        <th class="py-2.5 px-3 text-right">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="settings-employees-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- ====================================================================
+         BOTTOM NAVIGATION BAR (MOBILE)
+         ==================================================================== -->
+    <nav class="no-print lg:hidden fixed bottom-0 inset-x-0 bg-white border-t border-slate-200 flex items-center justify-around py-1.5 z-30">
+        <button data-nav-tab="attendance" onclick="App.switchTab('attendance')" class="mobile-nav-btn flex flex-col items-center justify-center py-2 px-3 text-indigo-600 font-semibold text-xs">
+            <i data-lucide="map-pin" class="w-4 h-4 mb-0.5"></i>
+            <span>Absen</span>
+        </button>
+        <button data-nav-tab="qr" onclick="App.switchTab('qr')" class="mobile-nav-btn flex flex-col items-center justify-center py-2 px-3 text-slate-500 text-xs">
+            <i data-lucide="qr-code" class="w-4 h-4 mb-0.5"></i>
+            <span>QR & ID</span>
+        </button>
+        <button data-nav-tab="leave" onclick="App.switchTab('leave')" class="mobile-nav-btn flex flex-col items-center justify-center py-2 px-3 text-slate-500 text-xs">
+            <i data-lucide="calendar-clock" class="w-4 h-4 mb-0.5"></i>
+            <span>Izin/Cuti</span>
+        </button>
+        <button data-nav-tab="admin-recap" onclick="App.switchTab('admin-recap')" class="mobile-nav-btn flex flex-col items-center justify-center py-2 px-3 text-slate-500 text-xs">
+            <i data-lucide="bar-chart-3" class="w-4 h-4 mb-0.5"></i>
+            <span>Rekap</span>
+        </button>
+        <button data-nav-tab="settings" onclick="App.switchTab('settings')" class="mobile-nav-btn flex flex-col items-center justify-center py-2 px-3 text-slate-500 text-xs">
+            <i data-lucide="database" class="w-4 h-4 mb-0.5"></i>
+            <span>Cloud</span>
+        </button>
+    </nav>
+
+    <!-- MODAL PREVIEW FOTO BUKTI ABSENSI -->
+    <div id="photo-evidence-modal" class="hidden fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div id="photo-evidence-content" class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200"></div>
+    </div>
+
+    <!-- CONTAINER TOAST NOTIFICATION -->
+    <div id="toast-container" class="no-print fixed top-16 right-4 z-50 space-y-2 flex flex-col items-end"></div>
+
+    <!-- SCRIPTS -->
+    <script src="js/supabase-service.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

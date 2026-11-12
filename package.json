@@ -1,0 +1,10 @@
+{
+  "name": "hadirku-aplikasi-absensi",
+  "version": "1.0.0",
+  "description": "Aplikasi Web Absensi Karyawan Modern (Selfie, GPS Geofencing, QR Code, Izin/Cuti/Lembur, Rekap Excel/CSV & Integrasi Cloud Supabase)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "license": "MIT"
+}
